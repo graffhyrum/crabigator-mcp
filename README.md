@@ -1,59 +1,106 @@
-# ts-template
+# crabigator-mcp
 
-Personal TypeScript project template for Joshua Pendragon.
+crabigator-mcp is an unofficial third-party tool. It is not affiliated with WaniKani or Tofugu. It is not endorsed by either of them.
 
-Clone the repo. Install dependencies. Run the quality gate. Then add your code.
+The program is a read-only MCP server. It speaks stdio. It reads the WaniKani API v2 with a personal access token.
+
+## Create a read-only token
+
+1. Open https://www.wanikani.com/settings/personal_access_tokens.
+2. Create a personal access token.
+3. Leave every write permission box unchecked. The token can read your study data and cannot change it.
+4. Copy the token into the `WANIKANI_API_TOKEN` environment variable for the server process.
+
+Do not commit the token. Do not paste a real token into this repo, a shell history you share, or a log.
+
+## Run the server
+
+Install dependencies with Bun 1.4.4.
 
 ```bash
 bun install
+```
+
+Local checkout, Bun:
+
+```json
+{
+  "mcpServers": {
+    "crabigator": {
+      "command": "bun",
+      "args": ["bin/crabigator-mcp.ts"],
+      "cwd": "/absolute/path/to/crabigator-mcp",
+      "env": {
+        "WANIKANI_API_TOKEN": "paste-your-read-only-token-here"
+      }
+    }
+  }
+}
+```
+
+After `bun run build`, Node can run the same server. Use this shape with `npx` once the package is installed, or with `node` from this repo:
+
+```json
+{
+  "mcpServers": {
+    "crabigator": {
+      "command": "node",
+      "args": ["dist/crabigator-mcp.js"],
+      "cwd": "/absolute/path/to/crabigator-mcp",
+      "env": {
+        "WANIKANI_API_TOKEN": "paste-your-read-only-token-here"
+      }
+    }
+  }
+}
+```
+
+`bunx crabigator-mcp` runs the `crabigator-mcp` bin after the package is installed. The placeholder above is not a token.
+
+The server prints MCP JSON on stdout. Do not write logs to stdout.
+
+## Tool
+
+`get_status` takes no arguments. It reads `GET /user` and `GET /summary`. The text reports the username, the level, lessons available now, reviews available now, the next review time, and review counts for the next 24 hours. A second text block is the same report as JSON.
+
+## Test locally
+
+The quality gate is the same command CI runs.
+
+```bash
 bun run vet
 ```
 
-Use [Bun](https://bun.sh) `1.4.4`. `packageManager` is `bun@1.4.4`.
+`vet` runs format, audit, typecheck, lint, rule-validator, stepdown, crap4ts, mutate4ts, and the coverage test. Unit tests use a mocked `fetch`. They do not call the network.
 
-## Quality gate
+Drive `get_status` over stdio against a local mock:
 
-`bun run vet` runs the steps below in order. It prints nothing when they pass. It prints the failing step only.
+```bash
+bun run build
+bun scripts/verify-stdio.ts --doctor
+bun scripts/verify-stdio.ts
+bun scripts/verify-stdio.ts --node
+```
 
-| Step           | Command                                       |
-| -------------- | --------------------------------------------- |
-| fmt            | `bun fmt --check`                             |
-| audit          | `bun audit`                                   |
-| typecheck      | `bun check`                                   |
-| lint           | `oxlint --type-aware`                         |
-| rule-validator | `rule-validator`                              |
-| stepdown       | `stepdown-rule`                               |
-| crap4ts        | coverage, then `crap4ts`                      |
-| mutate4ts      | mutation testing on `src/store.ts`            |
-| test           | `bun test` with the sample coverage threshold |
+The mock prints `evidence` and a new file path under `/tmp/crabigator-verify/`. The file does not contain a token.
 
-The audit step asks the npm advisory registry for known problems, so `vet` needs network access. A new advisory against any dependency, even a transitive one that your change did not touch, makes `vet` fail until you update that dependency (for example with `bun update`) and commit the new lockfile.
+Optional live check, with your own read-only token already in the environment:
 
-`bun run fmt` writes format fixes. `bun run lint:fix` writes lint fixes.
+```bash
+bun scripts/verify-stdio.ts --live
+```
 
-GitHub Actions runs `bun install --frozen-lockfile` and `bun run vet` on pull requests and on `main`.
-
-The sample coverage baseline is 100% functions and 100% lines for gated files. `scripts/coverage-threshold.ts` holds that threshold.
+The live command does not print the token. If the variable is missing, it exits 2.
 
 ## Commands
 
-| Command                 | Description                                  |
-| ----------------------- | -------------------------------------------- |
-| `bun run dev`           | Run `src/index.ts` with reload               |
-| `bun run build`         | Build for production                         |
-| `bun run start`         | Run `src/index.ts`                           |
-| `bun run test`          | Run tests                                    |
-| `bun run test:coverage` | Run tests and enforce the coverage threshold |
-| `bun run typecheck`     | Type-check with `bun check`                  |
-| `bun run lint`          | Lint with oxlint (type-aware)                |
-| `bun run fmt`           | Format with `bun fmt`                        |
-| `bun run vet`           | Run the full quality gate                    |
-
-No Git hook is installed. Run `bun run vet` before committing; CI runs the same gate.
-
-## Sample
-
-`src/` is a small multi-tenant web todo app (Bun + vanilla TS). `src/index.ts` serves it. `config.ts` reads `NODE_ENV` and `PORT` with arkenv. Replace with your code and keep `bun run vet` green.
+| Command         | Description                             |
+| --------------- | --------------------------------------- |
+| `bun run dev`   | Run the stdio server with reload        |
+| `bun run build` | Build `dist/crabigator-mcp.js` for Node |
+| `bun run start` | Run the stdio server                    |
+| `bun run test`  | Run unit tests                          |
+| `bun run vet`   | Run the quality gate                    |
 
 ## Code style
 
@@ -64,37 +111,4 @@ No Git hook is installed. Run `bun run vet` before committing; CI runs the same 
 - Import from the source file. Do not add barrel `index.ts` re-exports.
 - Put `*.test.ts` next to the source file. Use `bun:test`.
 
-`AGENTS.md` has the same rules for coding agents.
-
-## Project layout
-
-```
-.
-├── src/                 # Sample source and tests
-├── scripts/             # vet, crap4ts, and coverage threshold
-├── config.ts            # arkenv environment config
-├── tsconfig.json
-├── .github/workflows/   # CI runs bun run vet
-└── package.json
-```
-
-## Changesets
-
-Changesets is included for apps that publish. A private app can ignore it.
-
-```bash
-bun changeset
-bun run version-packages
-bun run release
-```
-
-## Stack
-
-- Bun `1.4.4` for the runtime, test runner, `bun check`, and `bun fmt`
-- oxlint type-aware for lint (`oxlint-tsgolint`)
-- `rule-validator` `v1.2.0`
-- `stepdown-rule` `v0.4.5`
-- `crap4ts` `v2.1.3`
-- `mutate4ts` `v1.0.0`
-- ArkType and arkenv
-- Changesets
+`AGENTS.md` has the same rules for coding agents. `.cursor/skills/verify-crabigator/SKILL.md` tells an agent how to prove a change.

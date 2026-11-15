@@ -2,14 +2,14 @@
 
 ## Commands
 
-- `bun run dev` - Run `src/index.ts` with reload
+- `bun run dev` - Run the stdio MCP server with reload
 - `bun run build` - Build for production
 - `bun run test` - Run all tests
 - `bun run test <pattern>` - Run specific tests matching pattern
 - `bun run typecheck` - Type-check with `bun check`
 - `bun run lint` - Lint with oxlint (type-aware)
 - `bun run fmt` - Format with `bun fmt`
-- `bun run vet` - Quiet quality gate. Order: fmt, audit, typecheck, lint, rule-validator, stepdown, crap4ts, test
+- `bun run vet` - Quiet quality gate. Order: fmt, audit, typecheck, lint, rule-validator, stepdown, crap4ts, mutate4ts, test
 
 ## Code Style
 
@@ -62,13 +62,6 @@ Use Bun's native APIs instead of Node equivalents:
 - Bun auto-loads `.env` - don't use `dotenv`
 - For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
 
-## Frontend
+## Server
 
-Use HTML imports with Bun, NOT vite:
-
-```ts
-import index from "./index.html";
-Bun.serve({ routes: { "/": index } });
-```
-
-HTML can import `.tsx`/`.css` directly. Run with `bun --hot ./index.ts`
+This package is a stdio MCP server. Do not add a web UI. Do not write logs to stdout. The only tool in this PR is `get_status`. Keep the WaniKani client read-only.

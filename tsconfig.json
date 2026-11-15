@@ -12,6 +12,7 @@
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
     "noEmit": true,
 
     // Best practices
@@ -27,5 +28,5 @@
     "noPropertyAccessFromIndexSignature": false,
     "types": ["bun"]
   },
-  "include": ["src/**/*", "scripts/**/*", "*.ts"]
+  "include": ["src/**/*", "scripts/**/*", "bin/**/*", "*.ts"]
 }
