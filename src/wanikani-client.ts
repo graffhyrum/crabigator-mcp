@@ -243,6 +243,7 @@ async function send(
   | { readonly kind: "body"; readonly body: unknown }
   | { readonly kind: "retry"; readonly resetAt: Date | null }
 > {
+  await waitForRemaining(ctx);
   const controller = new AbortController();
   return deadline(ctx.requestTimeoutMs, controller, () =>
     exchange(ctx, url, token, controller.signal),
@@ -258,7 +259,6 @@ async function exchange(
   | { readonly kind: "body"; readonly body: unknown }
   | { readonly kind: "retry"; readonly resetAt: Date | null }
 > {
-  await waitForRemaining(ctx);
   const cached = ctx.cache.get(url);
   const response = await ctx.fetch(buildRequest(url, token, cached, signal));
   noteLimit(ctx, response.headers);

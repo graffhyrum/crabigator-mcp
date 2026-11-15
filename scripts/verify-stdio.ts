@@ -50,6 +50,10 @@ async function mocked(runtime: "bun" | "node"): Promise<number> {
         WANIKANI_API_BASE: api.baseUrl,
       }),
     );
+    if (outputContainsToken(outcome, MOCK_TOKEN)) {
+      process.stderr.write("mock output contains the API token\n");
+      return 1;
+    }
     const evidenceFile = await writeEvidence("mock", outcome);
     return assertMock(outcome, window, evidenceFile);
   } finally {
@@ -69,14 +73,11 @@ async function live(): Promise<number> {
     "bun",
     childEnv({ WANIKANI_API_BASE: LIVE_BASE }),
   );
-  const evidenceFile = await writeEvidence("live", outcome);
-  if (
-    containsToken(outcome.text, token) ||
-    containsToken(outcome.stderr, token)
-  ) {
+  if (outputContainsToken(outcome, token)) {
     process.stderr.write("live output contains the API token\n");
     return 1;
   }
+  const evidenceFile = await writeEvidence("live", outcome);
   if (outcome.isError) {
     process.stderr.write("get_status returned an error\n");
     return 1;
@@ -181,13 +182,6 @@ function assertMock(
   window: StudyWindow,
   evidenceFile: string,
 ): number {
-  if (
-    containsToken(outcome.text, MOCK_TOKEN) ||
-    containsToken(outcome.stderr, MOCK_TOKEN)
-  ) {
-    process.stderr.write("mock output contains the API token\n");
-    return 1;
-  }
   if (outcome.isError) {
     process.stderr.write("get_status returned an error\n");
     return 1;
@@ -247,6 +241,12 @@ function isToolError(result: unknown): boolean {
     result !== null &&
     "isError" in result &&
     result.isError === true
+  );
+}
+
+function outputContainsToken(outcome: ToolOutcome, token: string): boolean {
+  return (
+    containsToken(outcome.text, token) || containsToken(outcome.stderr, token)
   );
 }
 

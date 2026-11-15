@@ -372,6 +372,31 @@ test("a base URL with a trailing slash still requests the resource", async () =>
   expect(http.requests[0]?.url).toBe(`${BASE}/user`);
 });
 
+test("a quota wait longer than the request deadline still completes", async () => {
+  const start = Date.now();
+  let now = start;
+  const clock: Clock = {
+    now: () => now,
+    sleep: async (ms) => {
+      await new Promise((resolve) => setTimeout(resolve, ms));
+      now += ms;
+    },
+  };
+  const reset = Math.floor(start / 1000) + 2;
+  const http = script([
+    jsonResponse(userBody(), 200, {
+      "RateLimit-Remaining": "0",
+      "RateLimit-Reset": `${reset}`,
+    }),
+    jsonResponse(userBody()),
+  ]);
+  const api = client(http.fetch, { clock, requestTimeoutMs: 50 });
+  await api.read(userEndpoint);
+  const user = await api.read(userEndpoint);
+  expect(user.username).toBe("example_user");
+  expect(http.requests).toHaveLength(2);
+});
+
 test("a hung request times out and the next read still runs", async () => {
   const http = script([jsonResponse(userBody())]);
   let hung = false;
