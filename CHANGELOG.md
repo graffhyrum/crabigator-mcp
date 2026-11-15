@@ -1,4 +1,10 @@
-# ts-template
+# crabigator-mcp
+
+## Unreleased
+
+### Minor Changes
+
+- Replace the sample todo app with a read-only stdio MCP server and the `get_status` tool.
 
 ## 0.3.0
 

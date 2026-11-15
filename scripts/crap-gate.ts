@@ -15,7 +15,7 @@ const score = await capture([
   "--include",
   "src/**/*.ts",
   "--exclude",
-  "{**/*.test.ts,src/client.ts}",
+  "**/*.test.ts",
   "--quiet",
 ]);
 if (score.exitCode !== 0) fail("score", score);

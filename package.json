@@ -1,15 +1,21 @@
 {
-  "name": "ts-template",
-  "version": "0.3.0",
-  "description": "Personal TypeScript project template with a quiet quality gate.",
-  "module": "src/index.ts",
+  "name": "crabigator-mcp",
+  "version": "0.1.0",
+  "description": "Unofficial read-only MCP server for the WaniKani API.",
+  "module": "bin/crabigator-mcp.ts",
   "type": "module",
-  "private": true,
+  "private": false,
+  "bin": {
+    "crabigator-mcp": "dist/crabigator-mcp.js"
+  },
+  "files": [
+    "dist"
+  ],
   "packageManager": "bun@1.4.4",
   "scripts": {
-    "dev": "bun --watch src/index.ts",
-    "build": "bun build src/index.ts --target bun --outdir ./dist",
-    "start": "bun src/index.ts",
+    "dev": "bun --watch bin/crabigator-mcp.ts",
+    "build": "bun build bin/crabigator-mcp.ts --target node --outfile dist/crabigator-mcp.js --banner \"#!/usr/bin/env node\"",
+    "start": "bun bin/crabigator-mcp.ts",
     "test": "bun test",
     "test:coverage": "bun scripts/coverage-threshold.ts",
     "typecheck": "bun check",
@@ -18,15 +24,16 @@
     "lint": "oxlint --type-aware",
     "lint:fix": "oxlint --fix --type-aware",
     "rule-validator": "rule-validator",
-    "stepdown": "stepdown-rule \"src/**/*.ts\" \"scripts/**/*.ts\" \"config.ts\"",
+    "stepdown": "stepdown-rule \"src/**/*.ts\" \"scripts/**/*.ts\" \"bin/**/*.ts\" \"config.ts\"",
     "crap4ts": "bun scripts/crap-gate.ts",
     "vet": "bun scripts/vet.ts",
     "version-packages": "changeset version",
     "release": "changeset publish",
-    "mutate4ts": "mutate4ts src/store.ts",
-    "mutate4ts:scan": "mutate4ts --scan src/store.ts"
+    "mutate4ts": "mutate4ts --test-command \"bun test src/status.test.ts\" src/status.ts",
+    "mutate4ts:scan": "mutate4ts --scan src/status.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "arkenv": "^0.8.1",
     "arktype": "^2.2.9"
   },
