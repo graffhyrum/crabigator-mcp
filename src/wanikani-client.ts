@@ -4,6 +4,7 @@ const REVISION = "20170710";
 const MAX_ATTEMPTS = 3;
 const FALLBACK_BACKOFF_MS = 5_000;
 const MAX_BACKOFF_MS = 65_000;
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 export type Fetch = (request: Request) => Promise<Response>;
 
@@ -17,6 +18,7 @@ export type ClientOptions = {
   readonly baseUrl: string;
   readonly fetch: Fetch;
   readonly clock: Clock;
+  readonly requestTimeoutMs?: number;
 };
 
 export type Parse<T> = (data: unknown) => T | ArkErrors;
@@ -74,6 +76,7 @@ type ClientContext = {
   readonly cache: Map<string, CacheEntry>;
   readonly fetch: Fetch;
   readonly clock: Clock;
+  readonly requestTimeoutMs: number;
   readonly limit: LimitState;
   tail: Promise<void>;
 };
@@ -88,10 +91,6 @@ type Outcome =
   | { readonly kind: "rate_limited"; readonly resetAt: Date | null }
   | { readonly kind: "unauthorized" }
   | { readonly kind: "unexpected_status"; readonly status: number };
-
-type RetryPlan =
-  | { readonly kind: "wait"; readonly ms: number }
-  | { readonly kind: "give_up"; readonly retryAt: Date | null };
 
 const ApiTokenSchema = type("string.trim").to("string > 0").brand("ApiToken");
 type ApiToken = typeof ApiTokenSchema.infer;
@@ -224,11 +223,14 @@ async function getJson(ctx: ClientContext, url: ApiUrl): Promise<unknown> {
   for (;;) {
     const shot = await send(ctx, url, token);
     if (shot.kind === "body") return shot.body;
-    const plan = planRetry(attemptNumber, shot.resetAt, ctx.clock.now());
-    if (plan.kind === "give_up") {
-      fail({ kind: "rate_limited", retryAt: plan.retryAt });
+    if (attemptNumber >= MAX_ATTEMPTS) {
+      fail({ kind: "rate_limited", retryAt: shot.resetAt });
     }
-    await ctx.clock.sleep(plan.ms);
+    if (shot.resetAt === null) {
+      await ctx.clock.sleep(FALLBACK_BACKOFF_MS);
+    } else {
+      await waitUntil(ctx, shot.resetAt.getTime());
+    }
     attemptNumber += 1;
   }
 }
@@ -241,9 +243,24 @@ async function send(
   | { readonly kind: "body"; readonly body: unknown }
   | { readonly kind: "retry"; readonly resetAt: Date | null }
 > {
+  const controller = new AbortController();
+  return deadline(ctx.requestTimeoutMs, controller, () =>
+    exchange(ctx, url, token, controller.signal),
+  );
+}
+
+async function exchange(
+  ctx: ClientContext,
+  url: ApiUrl,
+  token: ApiToken,
+  signal: AbortSignal,
+): Promise<
+  | { readonly kind: "body"; readonly body: unknown }
+  | { readonly kind: "retry"; readonly resetAt: Date | null }
+> {
   await waitForRemaining(ctx);
   const cached = ctx.cache.get(url);
-  const response = await ctx.fetch(buildRequest(url, token, cached));
+  const response = await ctx.fetch(buildRequest(url, token, cached, signal));
   noteLimit(ctx, response.headers);
   const outcome = await classify(response);
   switch (outcome.kind) {
@@ -265,9 +282,38 @@ async function waitForRemaining(ctx: ClientContext): Promise<void> {
   if (ctx.limit.remaining !== 0) return;
   const resetAtMs = ctx.limit.resetAtMs;
   if (resetAtMs === undefined) return;
-  const delay = resetAtMs - ctx.clock.now();
-  if (delay <= 0) return;
-  await ctx.clock.sleep(clamp(delay, 0, MAX_BACKOFF_MS));
+  await waitUntil(ctx, resetAtMs);
+}
+
+async function waitUntil(ctx: ClientContext, resetAtMs: number): Promise<void> {
+  for (;;) {
+    const delay = resetAtMs - ctx.clock.now();
+    if (delay <= 0) return;
+    await ctx.clock.sleep(clampToMax(delay, MAX_BACKOFF_MS));
+  }
+}
+
+function deadline<T>(
+  ms: number,
+  controller: AbortController,
+  work: () => Promise<T>,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error("The WaniKani request timed out."));
+    }, ms);
+    work().then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 function noteLimit(ctx: ClientContext, headers: Headers): void {
@@ -290,6 +336,7 @@ function buildRequest(
   url: ApiUrl,
   token: ApiToken,
   cached: CacheEntry | undefined,
+  signal: AbortSignal,
 ): Request {
   const headers = new Headers();
   headers.set("Authorization", `Bearer ${token}`);
@@ -298,7 +345,7 @@ function buildRequest(
     const header = conditionalHeader(cached.validator);
     headers.set(header.name, header.value);
   }
-  return new Request(url, { method: "GET", headers });
+  return new Request(url, { method: "GET", headers, signal });
 }
 
 function conditionalHeader(validator: Validator): {
@@ -380,22 +427,7 @@ function cachedBody(
   return entry.body;
 }
 
-function planRetry(
-  attemptNumber: number,
-  resetAt: Date | null,
-  now: number,
-): RetryPlan {
-  if (attemptNumber >= MAX_ATTEMPTS)
-    return { kind: "give_up", retryAt: resetAt };
-  if (resetAt === null) return { kind: "wait", ms: FALLBACK_BACKOFF_MS };
-  return {
-    kind: "wait",
-    ms: clamp(resetAt.getTime() - now, 0, MAX_BACKOFF_MS),
-  };
-}
-
-function clamp(value: number, min: number, max: number): number {
-  if (value < min) return min;
+function clampToMax(value: number, max: number): number {
   if (value > max) return max;
   return value;
 }
@@ -435,6 +467,7 @@ function makeContext(options: ClientOptions): ClientContext {
     cache: new Map(),
     fetch: options.fetch,
     clock: options.clock,
+    requestTimeoutMs: options.requestTimeoutMs ?? DEFAULT_TIMEOUT_MS,
     limit: { remaining: undefined, resetAtMs: undefined },
     tail: Promise.resolve(),
   };

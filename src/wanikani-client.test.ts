@@ -125,7 +125,7 @@ test("a 429 without RateLimit-Reset waits for the fallback", async () => {
   expect(clock.sleeps).toEqual([5_000]);
 });
 
-test("a 429 with a far reset waits at most 65 seconds", async () => {
+test("a 429 with a far reset waits until RateLimit-Reset", async () => {
   const clock = fakeClock(NOW);
   const reset = NOW / 1000 + 120;
   const http = script([
@@ -133,7 +133,8 @@ test("a 429 with a far reset waits at most 65 seconds", async () => {
     jsonResponse(userBody()),
   ]);
   await client(http.fetch, { clock }).read(userEndpoint);
-  expect(clock.sleeps).toEqual([65_000]);
+  expect(clock.sleeps).toEqual([65_000, 55_000]);
+  expect(http.requests).toHaveLength(2);
 });
 
 test("a 429 with a past reset does not wait", async () => {
@@ -144,7 +145,7 @@ test("a 429 with a past reset does not wait", async () => {
     jsonResponse(userBody()),
   ]);
   await client(http.fetch, { clock }).read(userEndpoint);
-  expect(clock.sleeps).toEqual([0]);
+  expect(clock.sleeps).toEqual([]);
 });
 
 test("three 429 responses become a rate limit error", async () => {
@@ -369,6 +370,22 @@ test("a base URL with a trailing slash still requests the resource", async () =>
   const http = script([jsonResponse(userBody())]);
   await client(http.fetch, { baseUrl: `${BASE}/` }).read(userEndpoint);
   expect(http.requests[0]?.url).toBe(`${BASE}/user`);
+});
+
+test("a hung request times out and the next read still runs", async () => {
+  const http = script([jsonResponse(userBody())]);
+  let hung = false;
+  const fetch: Fetch = (request) => {
+    if (!hung) {
+      hung = true;
+      return new Promise(() => undefined);
+    }
+    return http.fetch(request);
+  };
+  const api = client(fetch, { requestTimeoutMs: 30 });
+  await expect(api.read(userEndpoint)).rejects.toThrow("timed out");
+  const user = await api.read(userEndpoint);
+  expect(user.username).toBe("example_user");
 });
 
 test("isWaniKaniError rejects values that are not client failures", () => {

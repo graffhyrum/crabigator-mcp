@@ -15,6 +15,7 @@
   "scripts": {
     "dev": "bun --watch bin/crabigator-mcp.ts",
     "build": "bun build bin/crabigator-mcp.ts --target node --outfile dist/crabigator-mcp.js --banner \"#!/usr/bin/env node\"",
+    "prepack": "bun run build",
     "start": "bun bin/crabigator-mcp.ts",
     "test": "bun test",
     "test:coverage": "bun scripts/coverage-threshold.ts",

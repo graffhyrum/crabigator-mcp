@@ -2,7 +2,6 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 const EVIDENCE_DIR = "/tmp/crabigator-verify";
-const EVIDENCE_FILE = `${EVIDENCE_DIR}/get-status.json`;
 const MOCK_TOKEN = "test-token";
 const LIVE_BASE = "https://api.wanikani.com/v2";
 
@@ -41,7 +40,8 @@ async function mocked(runtime: "bun" | "node"): Promise<number> {
     );
     return 1;
   }
-  const api = startMock();
+  const window = studyWindow();
+  const api = startMock(window);
   try {
     const outcome = await callGetStatus(
       runtime,
@@ -50,8 +50,8 @@ async function mocked(runtime: "bun" | "node"): Promise<number> {
         WANIKANI_API_BASE: api.baseUrl,
       }),
     );
-    await writeEvidence("mock", outcome);
-    return assertMock(outcome);
+    const evidenceFile = await writeEvidence("mock", outcome);
+    return assertMock(outcome, window, evidenceFile);
   } finally {
     api.stop();
   }
@@ -69,7 +69,7 @@ async function live(): Promise<number> {
     "bun",
     childEnv({ WANIKANI_API_BASE: LIVE_BASE }),
   );
-  await writeEvidence("live", outcome);
+  const evidenceFile = await writeEvidence("live", outcome);
   if (
     containsToken(outcome.text, token) ||
     containsToken(outcome.stderr, token)
@@ -81,15 +81,18 @@ async function live(): Promise<number> {
     process.stderr.write("get_status returned an error\n");
     return 1;
   }
-  process.stdout.write(`evidence ${EVIDENCE_FILE}\n`);
+  process.stdout.write(`evidence ${evidenceFile}\n`);
   return 0;
 }
 
-function startMock(): { readonly baseUrl: string; readonly stop: () => void } {
+function startMock(window: StudyWindow): {
+  readonly baseUrl: string;
+  readonly stop: () => void;
+} {
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
-    fetch: (request) => mockResponse(request),
+    fetch: (request) => mockResponse(request, window),
   });
   return {
     baseUrl: `http://127.0.0.1:${server.port}/v2`,
@@ -99,7 +102,7 @@ function startMock(): { readonly baseUrl: string; readonly stop: () => void } {
   };
 }
 
-function mockResponse(request: Request): Response {
+function mockResponse(request: Request, window: StudyWindow): Response {
   if (request.headers.get("authorization") !== `Bearer ${MOCK_TOKEN}`) {
     return Response.json(
       { error: "Unauthorized. Nice try.", code: 401 },
@@ -114,7 +117,7 @@ function mockResponse(request: Request): Response {
   }
   const path = new URL(request.url).pathname;
   if (path === "/v2/user") return Response.json(mockUser());
-  if (path === "/v2/summary") return Response.json(mockSummary());
+  if (path === "/v2/summary") return Response.json(mockSummary(window));
   return Response.json({ error: "not found", code: 404 }, { status: 404 });
 }
 
@@ -153,10 +156,12 @@ async function callGetStatus(
 async function writeEvidence(
   mode: "mock" | "live",
   outcome: ToolOutcome,
-): Promise<void> {
-  await Bun.$`mkdir -p ${EVIDENCE_DIR}`.quiet();
+): Promise<string> {
+  const file = `${EVIDENCE_DIR}/${Date.now()}-${process.pid}-${crypto.randomUUID()}/get-status.json`;
+  const directory = file.slice(0, file.lastIndexOf("/"));
+  await Bun.$`mkdir -p ${directory}`.quiet();
   await Bun.write(
-    EVIDENCE_FILE,
+    file,
     `${JSON.stringify(
       {
         mode,
@@ -168,9 +173,14 @@ async function writeEvidence(
       2,
     )}\n`,
   );
+  return file;
 }
 
-function assertMock(outcome: ToolOutcome): number {
+function assertMock(
+  outcome: ToolOutcome,
+  window: StudyWindow,
+  evidenceFile: string,
+): number {
   if (
     containsToken(outcome.text, MOCK_TOKEN) ||
     containsToken(outcome.stderr, MOCK_TOKEN)
@@ -182,13 +192,12 @@ function assertMock(outcome: ToolOutcome): number {
     process.stderr.write("get_status returned an error\n");
     return 1;
   }
-  const window = studyWindow();
   const required = [
     "example_user is level 5.",
     "Lessons available now: 2",
     "Reviews available now: 3",
-    `Next reviews: ${window.next}`,
-    `${window.next} 1`,
+    `Next reviews: ${window.upcoming}`,
+    `${window.upcoming} 1`,
   ];
   for (const line of required) {
     if (!outcome.text.includes(line)) {
@@ -196,7 +205,7 @@ function assertMock(outcome: ToolOutcome): number {
       return 1;
     }
   }
-  process.stdout.write(`evidence ${EVIDENCE_FILE}\n`);
+  process.stdout.write(`evidence ${evidenceFile}\n`);
   return 0;
 }
 
@@ -254,36 +263,34 @@ function mockUser(): unknown {
   };
 }
 
-function mockSummary(): unknown {
-  const window = studyWindow();
+function mockSummary(window: StudyWindow): unknown {
   return {
     object: "report",
     url: "http://127.0.0.1/v2/summary",
-    data_updated_at: window.current,
+    data_updated_at: window.due,
     data: {
-      lessons: [{ available_at: window.current, subject_ids: [25, 26] }],
-      next_reviews_at: window.next,
+      lessons: [{ available_at: window.due, subject_ids: [25, 26] }],
+      next_reviews_at: window.upcoming,
       reviews: [
-        { available_at: window.current, subject_ids: [21, 23, 24] },
-        { available_at: window.next, subject_ids: [4] },
+        { available_at: window.due, subject_ids: [21, 23, 24] },
+        { available_at: window.upcoming, subject_ids: [4] },
       ],
     },
   };
 }
 
-function studyWindow(): { readonly current: string; readonly next: string } {
-  const now = new Date();
-  const current = new Date(
-    Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate(),
-      now.getUTCHours(),
-    ),
-  );
-  const next = new Date(current.getTime() + 60 * 60 * 1000);
-  return { current: current.toISOString(), next: next.toISOString() };
+function studyWindow(): StudyWindow {
+  const now = Date.now();
+  return {
+    due: new Date(now - 30 * 60 * 1000).toISOString(),
+    upcoming: new Date(now + 2 * 60 * 60 * 1000).toISOString(),
+  };
 }
+
+type StudyWindow = {
+  readonly due: string;
+  readonly upcoming: string;
+};
 
 type ToolOutcome = {
   readonly text: string;

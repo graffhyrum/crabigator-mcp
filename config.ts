@@ -13,8 +13,20 @@ export const CONFIG = {
   isProduction: env.NODE_ENV === "production",
   isTest: env.NODE_ENV === "test",
   port: env.PORT,
-  apiToken: env.WANIKANI_API_TOKEN,
-  apiBase: env.WANIKANI_API_BASE,
+  apiToken: normalizeApiToken(env.WANIKANI_API_TOKEN),
+  apiBase: normalizeApiBase(env.WANIKANI_API_BASE),
 } as const;
+
+export function normalizeApiToken(
+  value: string | undefined,
+): string | undefined {
+  if (value === undefined || value.length === 0) return undefined;
+  return value;
+}
+
+export function normalizeApiBase(value: string): string {
+  if (value.length === 0) return "https://api.wanikani.com/v2";
+  return value;
+}
 
 export type Config = typeof CONFIG;

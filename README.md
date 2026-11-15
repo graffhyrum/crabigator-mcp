@@ -82,7 +82,7 @@ bun scripts/verify-stdio.ts
 bun scripts/verify-stdio.ts --node
 ```
 
-The mock writes `/tmp/crabigator-verify/get-status.json`. The file does not contain a token.
+The mock prints `evidence` and a new file path under `/tmp/crabigator-verify/`. The file does not contain a token.
 
 Optional live check, with your own read-only token already in the environment:
 

@@ -17,7 +17,7 @@ A person with a read-only WaniKani personal access token can ask `get_status` fo
 
 Preconditions: doctor exits 0. The token is a read-only personal access token in the environment. Do not invent a token to make this path pass.
 
-- Action: run live mode. Command: `bun scripts/verify-stdio.ts --live`. Result: exit 0, and `/tmp/crabigator-verify/get-status.json` has `"mode": "live"` and `"isError": false`. The text names a level. The file does not contain the token.
+- Action: run live mode. Command: `bun scripts/verify-stdio.ts --live`. Result: exit 0. The printed evidence file has `"mode": "live"` and `"isError": false`. The text names a level. The file does not contain the token.
 - Action: run live mode without the token. Command: `env -u WANIKANI_API_TOKEN bun scripts/verify-stdio.ts --live`. Result: exit 2 and a stderr line that tells you to set `WANIKANI_API_TOKEN`. The line does not contain a token value.
 
 ## Gotchas

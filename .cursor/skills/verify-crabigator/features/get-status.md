@@ -17,8 +17,8 @@ A connector starts crabigator-mcp and calls `get_status`. The tool reports the u
 
 Preconditions: `bun scripts/verify-stdio.ts --doctor` exits 0. For `status-node`, `bun run build` has produced `dist/crabigator-mcp.js`.
 
-- Action: run the mock drive. Command: `bun scripts/verify-stdio.ts`. Result: exit 0, and `/tmp/crabigator-verify/get-status.json` has `"mode": "mock"`, `"isError": false`, and text that contains `example_user is level 5.`, `Lessons available now: 2`, `Reviews available now: 3`, and `Next reviews:`.
-- Action: run the Node drive. Command: `bun scripts/verify-stdio.ts --node`. Result: the same evidence shape and exit 0. The file is overwritten with the Node run.
+- Action: run the mock drive. Command: `bun scripts/verify-stdio.ts`. Result: exit 0. The printed evidence file has `"mode": "mock"`, `"isError": false`, and text that contains `example_user is level 5.`, `Lessons available now: 2`, `Reviews available now: 3`, and `Next reviews:`.
+- Action: run the Node drive. Command: `bun scripts/verify-stdio.ts --node`. Result: exit 0 and a new evidence file with the same shape. It does not replace the mock run's file.
 
 ## Gotchas
 

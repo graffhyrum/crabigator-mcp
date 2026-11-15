@@ -17,11 +17,11 @@ This directory is the source for proving the user-facing behavior of crabigator-
 - Run `bun scripts/verify-stdio.ts` for the mock and `bun scripts/verify-stdio.ts --node` after a build.
 - Run `bun scripts/verify-stdio.ts --live` only for the live feature.
 - Treat the command lines as exact.
-- Keep `/tmp/crabigator-verify/get-status.json` after the process exits.
+- Keep the evidence file printed by the script. Each run has its own path under `/tmp/crabigator-verify/`.
 
 ## Proof and skip reporting
 
-- Record the command, the exit code, and `/tmp/crabigator-verify/get-status.json`.
+- Record the command, the exit code, and the evidence path printed by the script.
 - The evidence text is the tool result. `isError` must be false for a passing drive.
 - A missing live token is exit 2. Report that as a skipped live path, not as a failed mock.
 - Do not report a mock drive as proof of the live path.

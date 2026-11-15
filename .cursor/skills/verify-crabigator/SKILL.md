@@ -26,7 +26,7 @@ bun scripts/verify-stdio.ts --node
 
 `bun run vet` is the quality gate. It runs format, audit, typecheck, lint, rule-validator, stepdown, crap4ts, mutate4ts, and the coverage test. The individual commands are `bun run fmt:check`, `bun run typecheck`, `bun run lint`, and `bun test`.
 
-The mock run is ready when the process exits 0 and prints `evidence /tmp/crabigator-verify/get-status.json`.
+The mock run is ready when the process exits 0 and prints `evidence` followed by a path. Each run writes its own file under `/tmp/crabigator-verify/`.
 
 Optional live run, only when a read-only token is already in the environment:
 
@@ -78,7 +78,7 @@ That spawns `bun bin/crabigator-mcp.ts` with `WANIKANI_API_BASE=https://api.wani
 
 ## Evidence
 
-Every drive writes `/tmp/crabigator-verify/get-status.json`. The file has `mode`, `tool`, `isError`, and `text`. It has no token and no request headers.
+Every drive writes a new file under `/tmp/crabigator-verify/` and prints `evidence` plus that path. The file has `mode`, `tool`, `isError`, and `text`. It has no token and no request headers. Use the printed path. Do not assume a shared file name.
 
 A proof is the command, the exit code, and that file. The text must show the level, the lesson count, the review count, the next review time, and an upcoming count. For the mock, the text includes `example_user is level 5.` and `Lessons available now: 2`.
 

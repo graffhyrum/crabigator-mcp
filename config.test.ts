@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { CONFIG } from "./config.ts";
+import { CONFIG, normalizeApiBase, normalizeApiToken } from "./config.ts";
 
 test("config follows NODE_ENV", () => {
   const nodeEnv = process.env.NODE_ENV;
@@ -20,6 +20,20 @@ test("config follows NODE_ENV", () => {
       ? "https://api.wanikani.com/v2"
       : configuredBase;
   expect(CONFIG.apiBase).toBe(expectedBase);
-  const token = CONFIG.apiToken;
-  expect(token === undefined || token.length > 0).toBe(true);
+  expect(CONFIG.apiToken).toBe(
+    normalizeApiToken(process.env.WANIKANI_API_TOKEN),
+  );
+});
+
+test("an empty API base falls back to the WaniKani API", () => {
+  expect(normalizeApiBase("")).toBe("https://api.wanikani.com/v2");
+  expect(normalizeApiBase("https://example.test/v2")).toBe(
+    "https://example.test/v2",
+  );
+});
+
+test("an empty token counts as missing", () => {
+  expect(normalizeApiToken(undefined)).toBeUndefined();
+  expect(normalizeApiToken("")).toBeUndefined();
+  expect(normalizeApiToken("read-only-token")).toBe("read-only-token");
 });
